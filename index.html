@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Salamandra IoT</title>
+  <meta name="theme-color" content="#00e676" />
+  <link rel="icon" href="https://i.ibb.co/67mjNJ3R/icon-Circulo-Salamandra-dark.png" />
+  <link rel="apple-touch-icon" href="https://i.ibb.co/67pSLYmV/icon-Circulo-Salamandra-ligth.png" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div id="auth" class="auth-screen">
+    <div class="auth-card glass">
+      <img id="authLogo" class="auth-logo" alt="Salamandra" />
+      <h1>Salamandra IoT</h1>
+      <p>Monitoreo y control ESP32</p>
+      <form id="loginForm" class="auth-form active">
+        <input id="loginEmail" type="email" placeholder="Email" required />
+        <input id="loginPassword" type="password" placeholder="Contraseña" required />
+        <button>Iniciar sesión</button>
+        <a data-auth="register">Crear cuenta</a><a data-auth="recover">Recuperar contraseña</a>
+      </form>
+      <form id="registerForm" class="auth-form">
+        <input id="regName" placeholder="Nombre" required />
+        <input id="regEmail" type="email" placeholder="Email" required />
+        <input id="regPassword" type="password" placeholder="Contraseña" required />
+        <button>Registrarme</button><a data-auth="login">Ya tengo cuenta</a>
+      </form>
+      <form id="recoverForm" class="auth-form">
+        <input id="recoverEmail" type="email" placeholder="Email" required />
+        <button>Enviar recupero</button><a data-auth="login">Volver</a>
+      </form>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <nav>
+        <button class="nav active" data-icon="dashboard" data-view="dashboard" title="Dashboard"><span>Dashboard</span></button>
+        <button class="nav" data-icon="users" data-view="users" title="Usuarios"><span>Usuarios</span></button>
+        <button class="nav super-only" data-icon="shield" data-view="roles" title="Roles"><span>Roles</span></button>
+        <button class="nav" data-icon="plans" data-view="plans" title="Planes"><span>Planes</span></button>
+        <button class="nav" data-icon="plug" data-view="devices" title="Dispositivos"><span>Dispositivos</span></button>
+        <button class="nav" data-icon="user" data-view="profile" title="Perfil"><span>Perfil</span></button>
+        <button class="nav" data-icon="cloud" data-view="mqtt" title="Broker MQTT"><span>MQTT</span></button>
+        <button class="nav" data-icon="settings" data-view="settings" title="Configuración"><span>Config</span></button>
+      </nav>
+    </aside>
+
+    <header class="topbar glass">
+      <img id="headerLogo" class="logo" alt="logo" />
+      <select id="placeSelect"></select>
+      <select id="deviceSelect"></select>
+      <div class="spacer"></div>
+      <button id="themeBtn" class="round" title="Tema"><span id="themeIcon"></span></button>
+      <button id="fullscreenBtn" class="round" data-icon="fullscreen" title="Pantalla completa"></button>
+      <div class="bell-wrap"><button class="round" data-icon="bell" title="Notificaciones"><b id="notifCount">3</b></button><div id="notifPanel" class="notif glass"></div></div>
+      <img id="avatar" class="avatar" alt="perfil" />
+      <button id="logoutBtn" class="round" data-icon="logout" title="Salir"></button>
+    </header>
+
+    <main class="content">
+      <section id="dashboard" class="view active">
+        <h2>Dashboard — <span id="dashPlace">Casa</span></h2>
+        <div class="toolbar">
+          <button class="round" data-icon="info" id="infoBtn" title="Información"></button><button class="round" data-icon="history" id="restartHistoryBtn" title="Historial de reinicios"></button><button class="round" data-icon="reset" id="remoteResetBtn" title="Reset remoto"></button><span>Último reset: <b id="lastReset">—</b></span><button class="round" data-icon="chart" id="cpuChartBtn" title="Gráficos"></button>
+        </div>
+        <div class="grid sensors"><button id="addSensor" class="add-card"><span class="add-content"><span class="add-svg-holder" data-icon="plus"></span>Añadir Sensor</span></button></div>
+        <h3>Actuadores</h3><div id="actuators" class="grid actuators"></div>
+      </section>
+      <section id="users" class="view"><h2>Usuarios</h2><div id="usersGrid" class="grid"></div></section>
+      <section id="roles" class="view"><h2>Roles y Permisos</h2><div id="rolesGrid" class="grid"></div></section>
+      <section id="plans" class="view"><h2>Planes de suscripción</h2><button id="createPlan" class="primary">Crear Plan</button><div id="plansGrid" class="grid"></div></section>
+      <section id="devices" class="view"><h2>Dispositivos</h2><p>Último agregado: <b id="lastDeviceInfo">—</b></p><button id="addDevice" class="add-card"><span class="add-content"><span class="add-svg-holder" data-icon="plus"></span>Añadir Dispositivo</span></button><div id="devicesGrid" class="grid devices"></div></section>
+      <section id="profile" class="view"><h2>Perfil</h2><div class="card"><label>Nombre<input id="profileName"></label><label>Email<input id="profileEmail" disabled></label><label>Imagen de perfil<input id="profileAvatar"></label><button id="saveProfile" class="primary">Guardar Perfil</button></div></section>
+      <section id="mqtt" class="view"><h2>Broker MQTT</h2><div class="card"><label>Host<input id="mqttHost" placeholder="mqtt://broker.hivemq.com"></label><label>Puerto<input id="mqttPort" placeholder="1883"></label><label>Usuario<input id="mqttUser"></label><label>Contraseña<input id="mqttPass" type="password"></label><button id="saveMqtt" class="primary">Guardar MQTT</button></div></section>
+      <section id="settings" class="view"><h2>Configuraciones del Software</h2><div class="card"><label>Logo claro<input id="logoLight"></label><label>Logo oscuro<input id="logoDark"></label><label>Favicon<input id="faviconUrl"></label><label>Icono instalación<input id="installIcon"></label><button id="saveSettings" class="primary">Guardar configuración</button></div></section>
+    </main>
+    <footer>© 2026 <a href="https://electronicagambino.com" target="_blank">Salamandra IoT – Electrónica Gambino</a></footer>
+  </div>
+
+  <dialog id="sensorDialog"><form method="dialog" id="sensorForm" class="modal-form"><button class="x" value="cancel">×</button><h2 id="sensorTitle">Añadir Sensor</h2><label>Tipo de sensor<select id="sensorType"></select></label><label>Nombre<input id="sensorName" required></label><label>Puerto<select id="sensorPort"></select></label><label>Variable ESP32<input id="sensorVar" required></label><label>Icono<select id="sensorIcon"></select></label><button class="primary">Guardar</button></form></dialog>
+  <dialog id="deviceDialog"><form method="dialog" id="deviceForm" class="modal-form"><button class="x" value="cancel">×</button><h2>Nuevo Dispositivo</h2><label>Ubicación<select id="devPlace"></select></label><label>Nombre<input id="devName" required></label><label>ID<input id="devId" placeholder="ESPXXXX" required></label><label>Número de Serie<input id="devSerie" placeholder="EG123456" required></label><label>Categoría<select id="devCat"></select></label><label>Domicilio<input id="devAddress" required></label><button class="primary">Guardar</button></form></dialog>
+  <dialog id="chartDialog"><div class="modal-form chart-modal"><button class="x" onclick="chartDialog.close()">×</button><h2>Historial Temperatura CPU ESP32</h2><canvas id="cpuChart"></canvas></div></dialog>
+
+  <script src="./js/app.js"></script>
+</body>
+</html>
