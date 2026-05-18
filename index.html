@@ -86,7 +86,19 @@
 
   <dialog id="sensorDialog"><form method="dialog" id="sensorForm" class="modal-form"><button class="x" value="cancel">×</button><h2 id="sensorTitle">Añadir Sensor</h2><label>Tipo de sensor<select id="sensorType"></select></label><label>Nombre<input id="sensorName" required></label><label>Puerto<select id="sensorPort"></select></label><label>Variable ESP32<input id="sensorVar" required></label><label>Icono<select id="sensorIcon"></select></label><button class="primary">Guardar</button></form></dialog>
   <dialog id="deviceDialog"><form method="dialog" id="deviceForm" class="modal-form"><button class="x" value="cancel">×</button><h2>Nuevo Dispositivo</h2><label>Ubicación<select id="devPlace"></select></label><label>Nombre<input id="devName" required></label><label>ID<input id="devId" placeholder="ESPXXXX" required></label><label>Número de Serie<input id="devSerie" placeholder="EG123456" required></label><label>Categoría<select id="devCat"></select></label><label>Domicilio<input id="devAddress" required></label><button class="primary">Guardar</button></form></dialog>
-  <dialog id="chartDialog"><div class="modal-form chart-modal"><button class="x" onclick="chartDialog.close()">×</button><h2>Historial Temperatura CPU ESP32</h2><canvas id="cpuChart"></canvas></div></dialog>
+  <dialog id="chartDialog">
+    <div class="modal-form chart-modal">
+      <button class="x" onclick="closeChartDialog()">×</button>
+      <h2 id="chartTitle">Historial</h2>
+      <div class="chart-filters">
+        <label>Desde<input id="chartFrom" type="datetime-local"></label>
+        <label>Hasta<input id="chartTo" type="datetime-local"></label>
+        <button id="refreshChartBtn" class="primary" type="button">Actualizar gráfico</button>
+      </div>
+      <p id="chartHelp" class="muted">Datos simulados hasta conectar lecturas reales desde ESP32/Supabase.</p>
+      <canvas id="cpuChart"></canvas>
+    </div>
+  </dialog>
 
   <script src="./js/app.js"></script>
 </body>

@@ -21,3 +21,9 @@ Luego ejecutá `supabase-schema.sql` en SQL Editor para crear tablas base.
 - Si no configurás Supabase, el login funciona en modo demo con `localStorage`.
 - La app permite alta/edición/baja visual de sensores, dispositivos, planes y actuadores.
 - Los mapas usan iframe de Google Maps con la dirección cargada.
+
+## Actualización: datos simulados en tiempo real
+- Todos los sensores generan lecturas simuladas cada 3 segundos.
+- Las tarjetas se actualizan automáticamente sin recargar la página.
+- El historial Chart.js usa las lecturas simuladas recientes y se refresca en vivo mientras el popup está abierto.
+- El código está preparado para reemplazar el simulador por lecturas reales desde ESP32/Supabase.
