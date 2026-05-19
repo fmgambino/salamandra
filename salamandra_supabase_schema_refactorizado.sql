@@ -509,7 +509,8 @@ with check (public.is_admin() or user_id in (select id from public.user_profiles
 -- =========================
 -- Vistas Dashboard SuperAdmin
 -- =========================
-create or replace view public.v_superadmin_dashboard as
+drop view if exists public.v_superadmin_dashboard cascade;
+create view public.v_superadmin_dashboard as
 select
   (select count(*) from public.user_profiles) as total_users,
   (select count(*) from public.subscriptions where status in ('active','trialing')) as total_subscribers,

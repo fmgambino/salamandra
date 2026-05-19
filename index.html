@@ -46,6 +46,8 @@
         <button class="nav super-only" data-icon="shield" data-view="roles" title="Roles"><span>Roles</span></button>
         <button class="nav" data-icon="plans" data-view="plans" title="Planes"><span>Planes</span></button>
         <button class="nav" data-icon="plug" data-view="devices" title="Dispositivos"><span>Dispositivos</span></button>
+        <button class="nav super-only" data-icon="support" data-view="support" title="Soporte Ticket"><span>Soporte Ticket</span></button>
+        <button class="nav super-only" data-icon="inventory" data-view="inventory" title="Inventario"><span>Inventario</span></button>
         <button class="nav" data-icon="user" data-view="profile" title="Perfil"><span>Perfil</span></button>
         <button class="nav" data-icon="cloud" data-view="mqtt" title="Broker MQTT"><span>MQTT</span></button>
         <button class="nav" data-icon="settings" data-view="settings" title="Configuración"><span>Config</span></button>
@@ -67,6 +69,14 @@
     <main class="content">
       <section id="dashboard" class="view active">
         <h2>Dashboard — <span id="dashPlace">Casa</span></h2>
+        <div id="superAdminDashboard" class="super-dashboard">
+          <div class="kpi-grid" id="superKpis"></div>
+          <div class="admin-panels">
+            <div class="card chart-card"><h3>Gráficos Estadísticos</h3><canvas id="adminStatsChart"></canvas></div>
+            <div class="card"><h3>Estado Broker / WiFi</h3><div id="brokerWifiPanel"></div></div>
+            <div class="card"><h3>Tickets de Soporte</h3><div id="ticketTicker" class="ticker"></div></div>
+          </div>
+        </div>
         <div class="toolbar">
           <button class="round" data-icon="info" id="infoBtn" title="Información"></button><button class="round" data-icon="history" id="restartHistoryBtn" title="Historial de reinicios"></button><button class="round" data-icon="reset" id="remoteResetBtn" title="Reset remoto"></button><span>Último reset: <b id="lastReset">—</b></span><button class="round" data-icon="chart" id="cpuChartBtn" title="Gráficos"></button>
         </div>
@@ -77,15 +87,17 @@
       <section id="roles" class="view"><h2>Roles y Permisos</h2><div id="rolesGrid" class="grid"></div></section>
       <section id="plans" class="view"><h2>Planes de suscripción</h2><button id="createPlan" class="primary">Crear Plan</button><div id="plansGrid" class="grid"></div></section>
       <section id="devices" class="view"><h2>Dispositivos</h2><p>Último agregado: <b id="lastDeviceInfo">—</b></p><button id="addDevice" class="add-card"><span class="add-content"><span class="add-svg-holder" data-icon="plus"></span>Añadir Dispositivo</span></button><div id="devicesGrid" class="grid devices"></div></section>
+      <section id="support" class="view"><h2>Soporte Ticket</h2><button id="addTicket" class="primary">Crear Ticket</button><div id="supportGrid" class="grid"></div></section>
+      <section id="inventory" class="view"><h2>Inventario</h2><button id="addInventory" class="primary">Agregar Item</button><div id="inventoryGrid" class="grid"></div></section>
       <section id="profile" class="view"><h2>Perfil</h2><div class="card"><label>Nombre<input id="profileName"></label><label>Email<input id="profileEmail" disabled></label><label>Imagen de perfil<input id="profileAvatar"></label><button id="saveProfile" class="primary">Guardar Perfil</button></div></section>
-      <section id="mqtt" class="view"><h2>Broker MQTT</h2><div class="card"><label>Host<input id="mqttHost" placeholder="mqtt://broker.hivemq.com"></label><label>Puerto<input id="mqttPort" placeholder="1883"></label><label>Usuario<input id="mqttUser"></label><label>Contraseña<input id="mqttPass" type="password"></label><button id="saveMqtt" class="primary">Guardar MQTT</button></div></section>
+      <section id="mqtt" class="view"><h2>Broker MQTT</h2><div class="card"><label>Host<input id="mqttHost" placeholder="broker.emqx.io"></label><label>Puerto<input id="mqttPort" placeholder="1883"></label><label>Usuario<input id="mqttUser"></label><label>Contraseña<input id="mqttPass" type="password"></label><button id="saveMqtt" class="primary">Guardar MQTT</button></div></section>
       <section id="settings" class="view"><h2>Configuraciones del Software</h2><div class="card"><label>Logo claro<input id="logoLight"></label><label>Logo oscuro<input id="logoDark"></label><label>Favicon<input id="faviconUrl"></label><label>Icono instalación<input id="installIcon"></label><button id="saveSettings" class="primary">Guardar configuración</button></div></section>
     </main>
     <footer>© 2026 <a href="https://electronicagambino.com" target="_blank">Salamandra IoT – Electrónica Gambino</a></footer>
   </div>
 
-  <dialog id="sensorDialog"><form method="dialog" id="sensorForm" class="modal-form"><button class="x" value="cancel">×</button><h2 id="sensorTitle">Añadir Sensor</h2><label>Tipo de sensor<select id="sensorType"></select></label><label>Nombre<input id="sensorName" required></label><label>Puerto<select id="sensorPort"></select></label><label>Variable ESP32<input id="sensorVar" required></label><label>Icono<select id="sensorIcon"></select></label><button class="primary">Guardar</button></form></dialog>
-  <dialog id="deviceDialog"><form method="dialog" id="deviceForm" class="modal-form"><button class="x" value="cancel">×</button><h2>Nuevo Dispositivo</h2><label>Ubicación<select id="devPlace"></select></label><label>Nombre<input id="devName" required></label><label>ID<input id="devId" placeholder="ESPXXXX" required></label><label>Número de Serie<input id="devSerie" placeholder="EG123456" required></label><label>Categoría<select id="devCat"></select></label><label>Domicilio<input id="devAddress" required></label><button class="primary">Guardar</button></form></dialog>
+  <dialog id="sensorDialog"><form method="dialog" id="sensorForm" class="modal-form"><button class="x" type="button" value="cancel">×</button><h2 id="sensorTitle">Añadir Sensor</h2><label>Tipo de sensor<select id="sensorType"></select></label><label>Nombre<input id="sensorName" required></label><label>Puerto<select id="sensorPort"></select></label><label>Variable ESP32<input id="sensorVar" required></label><label>Icono<select id="sensorIcon"></select></label><button class="primary">Guardar</button></form></dialog>
+  <dialog id="deviceDialog"><form method="dialog" id="deviceForm" class="modal-form"><button class="x" type="button" value="cancel">×</button><h2>Nuevo Dispositivo</h2><label>Ubicación<select id="devPlace"></select></label><label>Nombre<input id="devName" required></label><label>ID<input id="devId" placeholder="ESPXXXX" required></label><label>Número de Serie<input id="devSerie" placeholder="EG123456" required></label><label>Categoría<select id="devCat"></select></label><label>Domicilio<input id="devAddress" required></label><button class="primary">Guardar</button></form></dialog>
   <dialog id="chartDialog">
     <div class="modal-form chart-modal">
       <button class="x" onclick="closeChartDialog()">×</button>
@@ -95,11 +107,12 @@
         <label>Hasta<input id="chartTo" type="datetime-local"></label>
         <button id="refreshChartBtn" class="primary" type="button">Actualizar gráfico</button>
       </div>
-      <p id="chartHelp" class="muted">Datos simulados hasta conectar lecturas reales desde ESP32/Supabase.</p>
+      <p id="chartHelp" class="muted">Datos simulados hasta conectar lecturas reales desde ESP32/Supabase.</p><div id="chartToggles" class="chart-toggles color-only"></div>
       <canvas id="cpuChart"></canvas>
     </div>
   </dialog>
 
+  <script src="./js/auth.js"></script>
   <script src="./js/app.js"></script>
 </body>
 </html>

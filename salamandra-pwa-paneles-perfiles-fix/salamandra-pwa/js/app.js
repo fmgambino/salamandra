@@ -1042,3 +1042,85 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{
   // Clone device form
   const dfOld=$('#deviceForm'); if(dfOld){const df=dfOld.cloneNode(true); dfOld.replaceWith(df); df.setAttribute('novalidate','novalidate'); function ensureMap(){let m=$('#devMapPreview'); if(!m){m=document.createElement('iframe');m.id='devMapPreview';m.loading='lazy';m.referrerPolicy='no-referrer-when-downgrade';$('#devAddress')?.closest('label')?.after(m)} return m} function upd(){const m=ensureMap(); if(m)m.src=mapUrl($('#devAddress')?.value)} df.querySelector('.x').onclick=async e=>{e.preventDefault(); if(await ask({title:'Cancelar',text:'¿Cerrar sin guardar el dispositivo?',confirmButtonText:'Sí, cerrar'})) hide('#deviceDialog')}; $('#devAddress')?.addEventListener('input',upd); $('#devAddress')?.addEventListener('change',upd); df.onsubmit=async e=>{e.preventDefault(); const name=$('#devName').value.trim(), id=$('#devId').value.trim(), serie=$('#devSerie').value.trim(); if(!name||!id||!serie){toast('Completá Nombre, ID y Serie','warning');return} const d={place:$('#devPlace').value||'Casa',name,id,serie,cat:$('#devCat').value||'🔧 Genérico',address:$('#devAddress').value||'',ownerId:state.user?.id||5,online:true,wifi:88,ssid:'Salamandra_IoT_2.4G',network:'Salamandra IoT',rssi:'-49 dBm',ip:'192.168.1.'+(50+(state.devices?.length||0)),brokerStatus:'Conectado',cameraUrl:'',createdAt:new Date().toLocaleString('es-AR')}; hide('#deviceDialog'); if(!await ask({title:'Guardar dispositivo',text:'¿Confirmás guardar este dispositivo?',confirmButtonText:'Guardar'})){show('#deviceDialog');return} state.devices=state.devices||[]; const ix=state.devices.findIndex(x=>x.id===id); ix>=0?state.devices[ix]={...state.devices[ix],...d}:state.devices.push(d); state.selectedDevice=id; save(); renderAll(); toast('Dispositivo guardado')}; const oldOpen=window.openDeviceDialog; window.openDeviceDialog=function(id=null){if(oldOpen)oldOpen(id); show('#deviceDialog'); setTimeout(upd,50)}; }
 },300));
+
+/* === v08 FINAL: device modal stacking fix, live map, chart cleanup, reliable handlers === */
+(function(){
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc=s=>String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));
+  const saveState=()=>{try{save()}catch(e){try{localStorage.setItem('salamandra-state',JSON.stringify(state))}catch(_){}}};
+  const showDialog=sel=>{const d=$(sel); if(!d)return; try{if(!d.open)d.showModal()}catch(e){d.setAttribute('open','')}};
+  const closeDialog=sel=>{const d=$(sel); if(!d)return; try{if(d.open)d.close()}catch(e){d.removeAttribute('open')}};
+  const toast=(title,icon='success')=>Swal.fire({toast:true,position:'top-end',timer:1800,showConfirmButton:false,icon,title,heightAuto:false});
+  const ask=async(opts={})=>(await Swal.fire({heightAuto:false,allowOutsideClick:false,returnFocus:false,icon:opts.icon||'question',title:opts.title||'Confirmar',text:opts.text||'¿Deseás continuar?',showCancelButton:true,confirmButtonText:opts.confirmButtonText||'Confirmar',cancelButtonText:opts.cancelButtonText||'Cancelar',confirmButtonColor:'#00d977',cancelButtonColor:'#64748b',reverseButtons:true})).isConfirmed;
+  const mapSrc=addr=>'https://www.google.com/maps?q='+encodeURIComponent(addr||'San Miguel de Tucumán, Argentina')+'&output=embed';
+  const genId=()=> 'ESP'+Math.floor(100000+Math.random()*899999);
+  const genSerie=()=> 'EG'+Math.floor(100000+Math.random()*899999);
+  function currentDev(){return (state.devices||[]).find(d=>String(d.id)===String(state.selectedDevice))||(state.devices||[])[0];}
+
+  // Global dialog z-index + prevent stale stacked Swal backdrops.
+  const st=document.createElement('style');
+  st.textContent=`
+    dialog{z-index:1000}.swal2-container{z-index:300000!important}.modal-form{max-height:min(88vh,900px);overflow:auto}
+    #devMapPreview{width:100%;height:210px;border:0;border-radius:12px;margin:10px 0;background:#e5e7eb}
+    #chartToggles{display:none!important}.chart-modal{width:min(1000px,92vw)}.chart-scroll{overflow-x:auto;overflow-y:hidden;padding-bottom:10px}.chart-scroll canvas{display:block;min-width:1500px!important;height:420px!important}
+  `;
+  document.head.appendChild(st);
+
+  // Chart popups: remove custom selector buttons. Chart.js legend remains clickable to show/hide datasets.
+  function sensorById(id){return (state.sensors||[]).find(x=>String(x.id)===String(id)||String(x.remote_id)===String(id));}
+  function rnd(a,b,d=1){return +(a+Math.random()*(b-a)).toFixed(d)}
+  function defs(s){
+    const t=String(s?.type||s?.name||'').toLowerCase();
+    if(t.includes('dht')) return [{k:'temp',l:'Temperatura (°C)',c:'#ff7043'},{k:'hum',l:'Humedad (%)',c:'#29b6f6'}];
+    if(t.includes('mq135')||t.includes('gas')) return [{k:'co2',l:'CO₂ (ppm)',c:'#29b6f6'},{k:'metano',l:'Metano (ppm)',c:'#66bb6a'},{k:'butano',l:'Butano (ppm)',c:'#ffa726'},{k:'propano',l:'Propano (ppm)',c:'#ab47bc'}];
+    if(t.includes('ph')) return [{k:'ph',l:'pH',c:'#00e676'}];
+    if(t.includes('ec')||t.includes('conduct')) return [{k:'ec',l:'EC (µS/cm)',c:'#00e676'}];
+    if(t.includes('nivel')) return [{k:'nivel',l:'Nivel (%)',c:'#29b6f6'}];
+    return [{k:'value',l:(s?.name||'Sensor')+(s?.unit?' ('+s.unit+')':''),c:'#66bb6a'}];
+  }
+  function sample(s){
+    s.history=s.history||[]; const row={at:new Date().toISOString()};
+    defs(s).forEach(d=>{let last=s.history.length?s.history[s.history.length-1][d.k]:undefined; if(last==null){
+      if(d.k==='temp')last=rnd(22,31); else if(d.k==='hum'||d.k==='nivel'||d.k==='value')last=rnd(45,75,0); else if(d.k==='co2')last=rnd(400,520,0); else if(d.k==='metano')last=rnd(10,18); else if(d.k==='butano')last=rnd(4,8); else if(d.k==='propano')last=rnd(.5,2); else if(d.k==='ph')last=rnd(6.2,7.2,2); else if(d.k==='ec')last=rnd(720,900,0); else last=rnd(10,90);
+    }
+    const delta=(d.k==='co2'||d.k==='ec')?rnd(-20,20,0):(d.k==='ph'?rnd(-.06,.06,2):rnd(-1.2,1.2));
+    let v=+(Number(last)+delta).toFixed(d.k==='ph'?2:1); if(['hum','nivel','value'].includes(d.k))v=Math.max(0,Math.min(100,Math.round(v))); if(d.k==='ph')v=Math.max(0,Math.min(14,v)); row[d.k]=v; s[d.k]=v;});
+    s.history.push(row); s.history=s.history.slice(-1200); return row;
+  }
+  function ensureCanvas(){const c=$('#cpuChart'); if(!c)return null; let w=c.closest('.chart-scroll'); if(!w){w=document.createElement('div');w.className='chart-scroll';c.parentNode.insertBefore(w,c);w.appendChild(c)} c.width=1600;c.height=420;c.style.width='1600px';c.style.height='420px';return w;}
+  window.openSensorChart=function(id){const s=sensorById(id); if(!s){toast('Sensor no encontrado','error');return;} s.history=s.history||[]; while(s.history.length<160)sample(s); const now=new Date(), from=new Date(now.getTime()-6*3600000); $('#chartTitle').textContent='Historial de '+(s.name||'Sensor'); $('#chartHelp').textContent='Datos simulados en tiempo real. Usá la leyenda del gráfico para mostrar u ocultar variables. Scroll horizontal para registros anteriores.'; const tg=$('#chartToggles'); if(tg)tg.innerHTML=''; $('#chartFrom').value=from.toISOString().slice(0,16); $('#chartTo').value=now.toISOString().slice(0,16); $('#refreshChartBtn').onclick=()=>window.renderSensorChart(id,true); ensureCanvas(); showDialog('#chartDialog'); window.renderSensorChart(id,true); clearInterval(window.__sensorChartTimer); window.__sensorChartTimer=setInterval(()=>{sample(s); window.renderSensorChart(id,false); try{window.renderSensors?.()}catch(e){} saveState();},2500);};
+  window.renderSensorChart=function(id,moveEnd=true){const s=sensorById(id); if(!s)return; const wrap=ensureCanvas(); const from=new Date($('#chartFrom')?.value||0).getTime(), to=new Date($('#chartTo')?.value||Date.now()).getTime(); let rows=(s.history||[]).filter(r=>{const t=new Date(r.at).getTime(); return (!from||t>=from)&&(!to||t<=to)}); if(rows.length<10){for(let i=0;i<120;i++)sample(s); rows=s.history||[]} try{window.liveChart?.destroy?.()}catch(e){} const text=getComputedStyle(document.body).getPropertyValue('--text')||'#fff', muted=getComputedStyle(document.body).getPropertyValue('--muted')||'#9ca3af'; window.liveChart=new Chart($('#cpuChart'),{type:'line',data:{labels:rows.map(r=>new Date(r.at).toLocaleString('es-AR')),datasets:defs(s).map(d=>({label:d.l,data:rows.map(r=>r[d.k]),borderColor:d.c,backgroundColor:'transparent',pointRadius:0,borderWidth:2.4,tension:.25,fill:false,spanGaps:true}))},options:{responsive:false,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,position:'top',labels:{color:text,usePointStyle:true,boxWidth:12,font:{size:13,weight:'700'}}}},scales:{x:{ticks:{color:muted,maxRotation:45,minRotation:30,autoSkip:true,maxTicksLimit:28},grid:{color:'rgba(148,163,184,.12)'}},y:{ticks:{color:muted},grid:{color:'rgba(148,163,184,.12)'}}}}}); if(wrap&&moveEnd)wrap.scrollLeft=wrap.scrollWidth;};
+  window.closeChartDialog=function(){clearInterval(window.__sensorChartTimer); window.__sensorChartTimer=null; try{window.liveChart?.destroy?.();window.liveChart=null}catch(e){} closeDialog('#chartDialog')};
+
+  // Sensor cards: force chart/info/edit/delete click handlers after every render.
+  const prevRenderSensors=window.renderSensors;
+  window.renderSensors=function(){try{prevRenderSensors?.()}catch(e){} $$('.sensor-card').forEach(card=>{const id=card.dataset.sensorId||card.getAttribute('data-sensor-id'); const chart=card.querySelector('.sensor-chart-btn,[data-sensor-chart]'); if(chart){chart.onclick=(ev)=>{ev.preventDefault();ev.stopPropagation();window.openSensorChart(id||chart.dataset.sensorChart)}}});};
+
+  // Sensor form: allow close/cancel and ask before save without browser validation traps.
+  const oldSF=$('#sensorForm');
+  if(oldSF){
+    const sf=oldSF.cloneNode(true); oldSF.replaceWith(sf); sf.setAttribute('novalidate','novalidate');
+    window.openSensorDialog=function(id=null){window.editingSensorId=id||null; const s=id?sensorById(id):null; $('#sensorTitle').textContent=s?'Editar Sensor':'Añadir Sensor'; $('#sensorType').value=s?.type||''; $('#sensorName').value=s?.name||''; $('#sensorPort').value=s?.gpio||''; $('#sensorVar').value=s?.esp_variable||s?.espVariable||''; $('#sensorIcon').value=s?.icon||'info'; showDialog('#sensorDialog')};
+    window.cancelSensorForm=async()=>{closeDialog('#sensorDialog'); const ok=await ask({title:'Cancelar',text:'¿Cerrar sin guardar el sensor?',confirmButtonText:'Sí, cerrar'}); if(!ok)showDialog('#sensorDialog');};
+    sf.querySelector('.x')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.cancelSensorForm();});
+    sf.addEventListener('submit',async e=>{e.preventDefault();e.stopPropagation(); const isEdit=!!window.editingSensorId; const name=$('#sensorName').value.trim(); if(!name){toast('Ingresá el nombre del sensor','warning'); return;} const s=isEdit?sensorById(window.editingSensorId):{id:(crypto.randomUUID?.()||Date.now()),history:[]}; if(!s){toast('Sensor no encontrado','error');return;} Object.assign(s,{type:$('#sensorType').value||'Generico',name,gpio:$('#sensorPort').value||'',esp_variable:$('#sensorVar').value.trim(),icon:$('#sensorIcon').value||'info'}); closeDialog('#sensorDialog'); const ok=await ask({title:isEdit?'Actualizar sensor':'Añadir sensor',text:isEdit?'¿Confirmás actualizar este sensor?':'¿Confirmás agregar este nuevo sensor?',confirmButtonText:isEdit?'Actualizar':'Guardar'}); if(!ok){showDialog('#sensorDialog');return;} if(!isEdit)(state.sensors=state.sensors||[]).push(s); saveState(); try{window.renderSensors()}catch(e){} window.editingSensorId=null; toast(isEdit?'Sensor actualizado':'Sensor agregado'); },{capture:true});
+  }
+
+  // Device form: replicate requested form, live map while typing, close/confirm never behind native dialog.
+  const oldDF=$('#deviceForm');
+  if(oldDF){
+    const df=oldDF.cloneNode(true); oldDF.replaceWith(df); df.setAttribute('novalidate','novalidate');
+    function ensureMap(){let m=$('#devMapPreview'); if(!m){m=document.createElement('iframe');m.id='devMapPreview';m.loading='lazy';m.referrerPolicy='no-referrer-when-downgrade'; $('#devAddress')?.closest('label')?.after(m);} return m;}
+    function updateMap(){const m=ensureMap(); if(m)m.src=mapSrc($('#devAddress')?.value||'San Miguel de Tucumán, Argentina');}
+    function fillDev(d){$('#devPlace').value=d?.place||'Casa'; $('#devName').value=d?.name||''; $('#devId').value=d?.id||genId(); $('#devSerie').value=d?.serie||genSerie(); $('#devCat').value=d?.cat||'🔧 Genérico'; $('#devAddress').value=d?.address||'San Miguel de Tucumán, Argentina'; updateMap();}
+    window.openDeviceDialog=function(id=null){window.editingDeviceId=id||null; const d=id?(state.devices||[]).find(x=>String(x.id)===String(id)):null; $('#deviceForm h2').textContent=d?'Editar Dispositivo':'Nuevo Dispositivo'; fillDev(d); showDialog('#deviceDialog'); setTimeout(updateMap,80);};
+    window.closeDeviceDialog=async()=>{closeDialog('#deviceDialog'); const ok=await ask({title:'Cancelar',text:'¿Cerrar sin guardar el dispositivo?',confirmButtonText:'Sí, cerrar'}); if(!ok)showDialog('#deviceDialog');};
+    df.querySelector('.x')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.closeDeviceDialog();});
+    $('#devAddress')?.addEventListener('input',updateMap); $('#devAddress')?.addEventListener('change',updateMap);
+    df.addEventListener('submit',async e=>{e.preventDefault();e.stopPropagation(); const name=$('#devName').value.trim(), id=$('#devId').value.trim(), serie=$('#devSerie').value.trim(); if(!name||!id||!serie){toast('Completá Nombre, ID y Serie','warning');return;} const old=(state.devices||[]).find(x=>String(x.id)===String(window.editingDeviceId||id)); const d={...(old||{}),place:$('#devPlace').value||'Casa',name,id,serie,cat:$('#devCat').value||'🔧 Genérico',address:$('#devAddress').value||'',ownerId:old?.ownerId||state.user?.id||5,online:old?.online??true,wifi:old?.wifi??88,ssid:old?.ssid||'Salamandra_IoT_2.4G',network:old?.network||'Salamandra IoT',rssi:old?.rssi||'-49 dBm',ip:old?.ip||('192.168.1.'+(50+(state.devices?.length||0))),brokerStatus:old?.brokerStatus||'Conectado',cameraUrl:old?.cameraUrl||'',createdAt:old?.createdAt||new Date().toLocaleString('es-AR')}; closeDialog('#deviceDialog'); const ok=await ask({title:old?'Actualizar dispositivo':'Guardar dispositivo',text:old?'¿Confirmás actualizar este dispositivo?':'¿Confirmás guardar este dispositivo?',confirmButtonText:old?'Actualizar':'Guardar'}); if(!ok){showDialog('#deviceDialog');return;} state.devices=state.devices||[]; const ix=state.devices.findIndex(x=>String(x.id)===String(old?.id||id)); ix>=0?state.devices[ix]=d:state.devices.push(d); state.selectedDevice=id; saveState(); try{renderAll()}catch(e){try{renderDevices()}catch(_){}} toast(old?'Dispositivo actualizado':'Dispositivo guardado'); window.editingDeviceId=null; },{capture:true});
+  }
+
+  // Init/final rerender.
+  setTimeout(()=>{try{window.renderSensors?.()}catch(e){}},300);
+})();
